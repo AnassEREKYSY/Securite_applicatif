@@ -1,6 +1,8 @@
 const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
+const uuid = require('uuid');
+const { getRegisteredUsers } = require('./inMemoryUserRepository');
 
 app.use(bodyParser.json());
 
@@ -10,19 +12,28 @@ const logHeaders = (req, res, next) => {
     next();
 };
 
-const firewall = () => {
-    return (req, res, next) => {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || authHeader !== `Bearer ${global.token}`) {
-            return res.status(403).send('Accès interdit. Token manquant ou invalide.');
-        }
-        next();
-    };
+const firewall = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    console.log('Authorization Header:', authHeader);
+    if (!authHeader || !global.authenticatedUsers[authHeader]) {
+        console.log('Token invalide ou manquant');
+        return res.status(403).send('Accès interdit. Token manquant ou invalide.');
+    }
+    console.log('Token valide');
+    next();
 };
 
-//const allowedUrls = ['/hello'];
-app.use(logHeaders); 
-app.use(firewall);
+// Liste des URL autorisées (à adapter selon vos besoins)
+const allowedUrls = ['/hello'];
+
+// Activation sélective du middleware firewall
+app.use(logHeaders);
+app.use((req, res, next) => {
+    if (allowedUrls.includes(req.path)) {
+        return next();
+    }
+    firewall(req, res, next);
+});
 
 
 
@@ -59,19 +70,28 @@ app.get('/restricted2', (req, res) => {
 
 //exo6
 
-const generateRandomToken = () => {
-    return Math.random().toString(36).substr(2); // Génère un token aléatoire
-};
-
+// const generateRandomToken = () => {
+//     return Math.random().toString(36).substr(2);
+// };
 app.post('/authenticate', (req, res) => {
     const { email, password } = req.body;
-    if (!email || !password) {
-        return res.status(400).send('Email et mot de passe requis');
+    const user = checkCredentials(email, password);
+    if (!user) {
+        return res.status(403).send('Accès interdit. Identifiants invalides.');
     }
-    const token = generateRandomToken();
-    global.token = token;
+    const token = uuid.v4();
+    global.authenticatedUsers[token] = { email: user.email };
     res.json({ token });
 });
+
+
+//exo7
+const checkCredentials = (email, password) => {
+    const users = getRegisteredUsers();
+    return users.find(user => user.email === email && user.password === password);
+};
+
+global.authenticatedUsers = {};
 
 
 
