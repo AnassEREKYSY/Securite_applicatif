@@ -1,29 +1,28 @@
 const express = require('express');
 const app = express();
+const bodyParser = require('body-parser');
+
+app.use(bodyParser.json());
 
 //exo5 
 const logHeaders = (req, res, next) => {
     console.log('Request Headers:', req.headers);
     next();
 };
-const firewall = (allowedUrls) => {
+
+const firewall = () => {
     return (req, res, next) => {
-        const requestedUrl = req.originalUrl;
-        if (allowedUrls.includes(requestedUrl)) {
-            next();
-        } else {
-            const token = req.headers.token;
-            if (!token || token !== '42') {
-                return res.status(403).send('Accès interdit. Token manquant ou invalide.');
-            }
-            next();
+        const authHeader = req.headers.authorization;
+        if (!authHeader || authHeader !== `Bearer ${global.token}`) {
+            return res.status(403).send('Accès interdit. Token manquant ou invalide.');
         }
+        next();
     };
 };
 
-const allowedUrls = ['/hello'];
+//const allowedUrls = ['/hello'];
 app.use(logHeaders); 
-app.use(firewall(allowedUrls));
+app.use(firewall);
 
 
 
@@ -53,6 +52,27 @@ app.get('/restricted2', (req, res) => {
     }
     res.send('<h1>Admin space</h1>');
 });
+
+
+
+
+
+//exo6
+
+const generateRandomToken = () => {
+    return Math.random().toString(36).substr(2); // Génère un token aléatoire
+};
+
+app.post('/authenticate', (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).send('Email et mot de passe requis');
+    }
+    const token = generateRandomToken();
+    global.token = token;
+    res.json({ token });
+});
+
 
 
 
